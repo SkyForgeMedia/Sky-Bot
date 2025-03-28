@@ -1,4 +1,4 @@
-# Mindless Bot
+# Sky-Bot
 
 <h1 align="center"> ✨ Features ✨ </h1>
 
