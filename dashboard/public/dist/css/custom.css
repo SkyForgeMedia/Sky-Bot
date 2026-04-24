@@ -1,6 +1,115 @@
+:root {
+  --bg-900: #0d1117;
+  --bg-800: #111827;
+  --bg-700: #182132;
+  --text-main: #e5e7eb;
+  --text-soft: #9ca3af;
+  --brand: #7c3aed;
+  --brand-2: #22d3ee;
+  --card-border: rgba(124, 58, 237, 0.35);
+}
+
+body,
+.content-wrapper,
+.right-side {
+  background: radial-gradient(circle at top right, #171f32, #090d14 60%) !important;
+  color: var(--text-main);
+  font-family: Inter, "Source Sans Pro", sans-serif;
+}
+
+.main-header .navbar,
+.main-header .logo,
+.main-sidebar,
+.main-footer {
+  background: rgba(10, 14, 25, 0.92) !important;
+  color: var(--text-main) !important;
+  border-color: #222c3d !important;
+}
+
+.sidebar-menu > li.header,
+.user-panel > .info,
+.sidebar a,
+.main-header .logo,
+.main-header .navbar .nav > li > a,
+.main-header .navbar .sidebar-toggle {
+  color: var(--text-main) !important;
+}
+
+.sidebar-form input,
+.sidebar-form .btn,
+.form-control {
+  background: #0f1725;
+  border: 1px solid #2a3650;
+  color: var(--text-main);
+}
+
+.form-control:focus {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25);
+}
+
+.box,
+.alert,
+.dropdown-menu,
+.user-footer {
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.95), rgba(11, 17, 30, 0.95));
+  border: 1px solid #273248;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  color: var(--text-main);
+}
+
+.box-header.with-border {
+  border-bottom: 1px solid #273248;
+}
+
+.dashboard-card {
+  border: 1px solid var(--card-border);
+}
+
+.btn-primary,
+.btn-success,
+.btn-info {
+  background: linear-gradient(135deg, var(--brand), var(--brand-2));
+  border: none;
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #dc2626, #f97316);
+  border: none;
+}
+
+.btn-default,
+.btn-warning {
+  background: #1f2937;
+  border-color: #344156;
+  color: var(--text-main);
+}
+
+.content-header > h1,
+.content-header > h3,
+.box-title {
+  color: #f8fafc;
+}
+
+.breadcrumb > li > a,
+.breadcrumb > .active {
+  color: var(--text-soft);
+}
+
 .server-name {
-    overflow: hidden;
-    width: calc(80%);
-    white-space: nowrap;
-    text-overflow: ellipsis;
+  overflow: hidden;
+  width: calc(80%);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.grid-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mtop {
+  margin-top: 16px;
 }
