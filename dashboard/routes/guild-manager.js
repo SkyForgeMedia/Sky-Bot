@@ -5,23 +5,67 @@ const express = require("express"),
   CheckAuth = require("../auth/CheckAuth"),
   router = express.Router();
 
+
+function ensureManageAccess(req, res) {
+  const guild = req.client.guilds.cache.get(req.params.serverID);
+  if (!guild || !req.userInfos.displayedGuilds || !req.userInfos.displayedGuilds.find((g) => g.id === req.params.serverID)) {
+    res.render("404", {
+      user: req.userInfos,
+      currentURL: `${req.client.config.DASHBOARD.baseURL}/${req.originalUrl}`,
+    });
+    return null;
+  }
+  return guild;
+}
+
+function redirectWithStatus(res, guildId, status, message) {
+  const params = new URLSearchParams({ status, message });
+  return res.redirect(303, `/manage/${guildId}/moderation?${params.toString()}`);
+}
+
+function ensureDashboardDefaults(settings) {
+  if (!settings.ticket) settings.ticket = {};
+  if (!Array.isArray(settings.ticket.categories)) settings.ticket.categories = [];
+
+  if (!settings.suggestions) settings.suggestions = {};
+  if (!Array.isArray(settings.suggestions.staff_roles)) settings.suggestions.staff_roles = [];
+  if (typeof settings.suggestions.enabled !== "boolean") settings.suggestions.enabled = false;
+
+  return settings;
+}
+
+async function resolveMember(guild, memberId) {
+  if (!memberId) return null;
+  const cached = guild.members.cache.get(memberId);
+  if (cached) return cached;
+  try {
+    return await guild.members.fetch(memberId);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchMembersWithTimeout(guild, timeoutMs = 5000) {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("MEMBER_FETCH_TIMEOUT")), timeoutMs);
+  });
+
+  try {
+    const members = await Promise.race([guild.members.fetch(), timeoutPromise]);
+    return { members, fromCacheOnly: false };
+  } catch {
+    return { members: guild.members.cache, fromCacheOnly: true };
+  }
+}
+
 router.get("/:serverID", CheckAuth, async (req, res) => {
   res.redirect(`/manage/${req.params.serverID}/basic`);
 });
 
 router.get("/:serverID/basic", CheckAuth, async (req, res) => {
   // Check if the user has the permissions to edit this guild
-  const guild = req.client.guilds.cache.get(req.params.serverID);
-  if (
-    !guild ||
-    !req.userInfos.displayedGuilds ||
-    !req.userInfos.displayedGuilds.find((g) => g.id === req.params.serverID)
-  ) {
-    return res.render("404", {
-      user: req.userInfos,
-      currentURL: `${req.client.config.DASHBOARD.baseURL}/${req.originalUrl}`,
-    });
-  }
+  const guild = ensureManageAccess(req, res);
+  if (!guild) return;
 
   // Fetch guild informations
   const guildInfos = await utils.fetchGuild(guild.id, req.client, req.user.guilds);
@@ -36,17 +80,8 @@ router.get("/:serverID/basic", CheckAuth, async (req, res) => {
 
 router.get("/:serverID/greeting", CheckAuth, async (req, res) => {
   // Check if the user has the permissions to edit this guild
-  const guild = req.client.guilds.cache.get(req.params.serverID);
-  if (
-    !guild ||
-    !req.userInfos.displayedGuilds ||
-    !req.userInfos.displayedGuilds.find((g) => g.id === req.params.serverID)
-  ) {
-    return res.render("404", {
-      user: req.userInfos,
-      currentURL: `${req.client.config.DASHBOARD.baseURL}/${req.originalUrl}`,
-    });
-  }
+  const guild = ensureManageAccess(req, res);
+  if (!guild) return;
 
   // Fetch guild informations
   const guildInfos = await utils.fetchGuild(guild.id, req.client, req.user.guilds);
@@ -61,17 +96,8 @@ router.get("/:serverID/greeting", CheckAuth, async (req, res) => {
 
 router.post("/:serverID/basic", CheckAuth, async (req, res) => {
   // Check if the user has the permissions to edit this guild
-  const guild = req.client.guilds.cache.get(req.params.serverID);
-  if (
-    !guild ||
-    !req.userInfos.displayedGuilds ||
-    !req.userInfos.displayedGuilds.find((g) => g.id === req.params.serverID)
-  ) {
-    return res.render("404", {
-      user: req.userInfos,
-      currentURL: `${req.client.config.DASHBOARD.baseURL}/${req.originalUrl}`,
-    });
-  }
+  const guild = ensureManageAccess(req, res);
+  if (!guild) return;
 
   const settings = await getSettings(guild);
   const data = req.body;
@@ -196,17 +222,8 @@ router.post("/:serverID/basic", CheckAuth, async (req, res) => {
 
 router.post("/:serverID/greeting", CheckAuth, async (req, res) => {
   // Check if the user has the permissions to edit this guild
-  const guild = req.client.guilds.cache.get(req.params.serverID);
-  if (
-    !guild ||
-    !req.userInfos.displayedGuilds ||
-    !req.userInfos.displayedGuilds.find((g) => g.id === req.params.serverID)
-  ) {
-    return res.render("404", {
-      user: req.userInfos,
-      currentURL: `${req.client.config.DASHBOARD.baseURL}/${req.originalUrl}`,
-    });
-  }
+  const guild = ensureManageAccess(req, res);
+  if (!guild) return;
 
   const settings = await getSettings(guild);
   const data = req.body;
@@ -339,6 +356,277 @@ router.post("/:serverID/greeting", CheckAuth, async (req, res) => {
 
   await settings.save();
   res.redirect(303, `/manage/${guild.id}/greeting`);
+});
+
+router.get("/:serverID/features", CheckAuth, async (req, res) => {
+  const guild = ensureManageAccess(req, res);
+  if (!guild) return;
+
+  const guildInfos = await utils.fetchGuild(guild.id, req.client, req.user.guilds);
+  ensureDashboardDefaults(guildInfos);
+  const textChannels = guild.channels.cache
+    .filter((ch) => ch.type === 0)
+    .sort((a, b) => a.rawPosition - b.rawPosition)
+    .map((ch) => ch)
+    .slice(0, 150);
+  const roles = guild.roles.cache
+    .filter((role) => role.name !== "@everyone")
+    .sort((a, b) => b.position - a.position)
+    .map((role) => role)
+    .slice(0, 150);
+
+  res.render("manager/features", {
+    guild: guildInfos,
+    user: req.userInfos,
+    bot: req.client,
+    textChannels,
+    roles,
+    status: req.query.status,
+    message: req.query.message,
+    currentURL: `${req.client.config.DASHBOARD.baseURL}/${req.originalUrl}`,
+  });
+});
+
+router.post("/:serverID/features", CheckAuth, async (req, res) => {
+  const guild = ensureManageAccess(req, res);
+  if (!guild) return;
+
+  const settings = ensureDashboardDefaults(await getSettings(guild));
+  const data = req.body;
+
+  try {
+    if (Object.prototype.hasOwnProperty.call(data, "autoroleSave")) {
+      if (!data.autorole_id || data.autorole_id === "none") {
+        settings.autorole = null;
+      } else {
+        settings.autorole = data.autorole_id;
+      }
+      await settings.save();
+      const msg = settings.autorole ? "Autorole wurde gespeichert." : "Autorole wurde deaktiviert.";
+      return res.redirect(303, `/manage/${guild.id}/features?status=success&message=${encodeURIComponent(msg)}`);
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, "suggestionSave")) {
+      settings.suggestions.enabled = data.suggestion_enabled === "on";
+      settings.suggestions.channel_id = data.suggestion_channel_id || null;
+      settings.suggestions.approved_channel = data.suggestion_approved_channel || null;
+      settings.suggestions.rejected_channel = data.suggestion_rejected_channel || null;
+
+      if (data.suggestion_staff_roles?.length) {
+        const selectedRoles = Array.isArray(data.suggestion_staff_roles)
+          ? data.suggestion_staff_roles
+          : [data.suggestion_staff_roles];
+        settings.suggestions.staff_roles = selectedRoles.filter((id) => guild.roles.cache.has(id));
+      } else {
+        settings.suggestions.staff_roles = [];
+      }
+
+      await settings.save();
+      return res.redirect(
+        303,
+        `/manage/${guild.id}/features?status=success&message=${encodeURIComponent("Suggestion Einstellungen gespeichert.")}`
+      );
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, "ticketCategoryAdd")) {
+      const categoryName = data.ticket_category_name?.trim();
+      if (!categoryName) {
+        return res.redirect(
+          303,
+          `/manage/${guild.id}/features?status=danger&message=${encodeURIComponent("Kategorie-Name fehlt.")}`
+        );
+      }
+
+      if (settings.ticket.categories.find((c) => c.name.toLowerCase() === categoryName.toLowerCase())) {
+        return res.redirect(
+          303,
+          `/manage/${guild.id}/features?status=warning&message=${encodeURIComponent("Kategorie existiert bereits.")}`
+        );
+      }
+
+      const selectedRoles = data.ticket_staff_roles
+        ? Array.isArray(data.ticket_staff_roles)
+          ? data.ticket_staff_roles
+          : [data.ticket_staff_roles]
+        : [];
+
+      settings.ticket.categories.push({
+        name: categoryName,
+        staff_roles: selectedRoles.filter((id) => guild.roles.cache.has(id)),
+      });
+      await settings.save();
+      return res.redirect(
+        303,
+        `/manage/${guild.id}/features?status=success&message=${encodeURIComponent("Ticket Kategorie hinzugefügt.")}`
+      );
+    }
+
+    if (Object.prototype.hasOwnProperty.call(data, "ticketCategoryRemove")) {
+      const categoryName = data.ticket_category_remove;
+      if (!categoryName) {
+        return res.redirect(
+          303,
+          `/manage/${guild.id}/features?status=danger&message=${encodeURIComponent(
+            "Bitte Kategorie zum Entfernen wählen."
+          )}`
+        );
+      }
+
+      settings.ticket.categories = settings.ticket.categories.filter((c) => c.name !== categoryName);
+      await settings.save();
+      return res.redirect(
+        303,
+        `/manage/${guild.id}/features?status=success&message=${encodeURIComponent("Ticket Kategorie entfernt.")}`
+      );
+    }
+
+    return res.redirect(
+      303,
+      `/manage/${guild.id}/features?status=warning&message=${encodeURIComponent("Keine gültige Aktion erkannt.")}`
+    );
+  } catch (err) {
+    return res.redirect(
+      303,
+      `/manage/${guild.id}/features?status=danger&message=${encodeURIComponent(err.message || "Änderung fehlgeschlagen")}`
+    );
+  }
+});
+
+
+router.get("/:serverID/moderation", CheckAuth, async (req, res) => {
+  const guild = ensureManageAccess(req, res);
+  if (!guild) return;
+
+  const guildInfos = await utils.fetchGuild(guild.id, req.client, req.user.guilds);
+  let displayedMembers = [];
+  let status = req.query.status;
+  let message = req.query.message;
+
+  const { members, fromCacheOnly } = await fetchMembersWithTimeout(guild, 5000);
+  displayedMembers = members
+    .filter((member) => !member.user.bot)
+    .sort((a, b) => a.displayName.localeCompare(b.displayName))
+    .first(100);
+
+  if (fromCacheOnly) {
+    status = status || "warning";
+    message =
+      message ||
+      "Mitglieder-Liste wurde wegen Timeout aus dem Cache geladen. Für vollständige Listen bitte Server Members Intent aktivieren.";
+  }
+
+  const roles = guild.roles.cache
+    .filter((role) => role.name !== "@everyone" && !role.managed)
+    .sort((a, b) => b.position - a.position)
+    .map((role) => role)
+    .slice(0, 100);
+
+  res.render("manager/moderation", {
+    guild: guildInfos,
+    user: req.userInfos,
+    bot: req.client,
+    members: displayedMembers,
+    roles,
+    status,
+    message,
+    currentURL: `${req.client.config.DASHBOARD.baseURL}/${req.originalUrl}`,
+  });
+});
+
+router.post("/:serverID/moderation", CheckAuth, async (req, res) => {
+  const guild = ensureManageAccess(req, res);
+  if (!guild) return;
+
+  const data = req.body;
+  const resolvedMemberId = data.member_id || data.member_id_manual?.trim();
+
+  try {
+    if (data.memberRoleAdd || data.memberRoleRemove || data.memberTimeout || data.memberUntimeout || data.memberKick || data.memberBan || data.memberNick) {
+      if (!resolvedMemberId) {
+        return redirectWithStatus(res, guild.id, "danger", "Bitte ein Mitglied auswählen oder User-ID eintragen.");
+      }
+    }
+
+    if (data.memberRoleAdd || data.memberRoleRemove) {
+      const member = await resolveMember(guild, resolvedMemberId);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
+      if (!data.role_id) {
+        return redirectWithStatus(res, guild.id, "danger", "Bitte eine Rolle auswählen.");
+      }
+
+      if (data.memberRoleAdd) {
+        await member.roles.add(data.role_id, `Dashboard action by ${req.userInfos.tag}`);
+        return redirectWithStatus(res, guild.id, "success", `Rolle wurde ${member.user.tag} hinzugefügt.`);
+      }
+
+      await member.roles.remove(data.role_id, `Dashboard action by ${req.userInfos.tag}`);
+      return redirectWithStatus(res, guild.id, "success", `Rolle wurde bei ${member.user.tag} entfernt.`);
+    }
+
+    if (data.memberTimeout) {
+      const member = await resolveMember(guild, resolvedMemberId);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
+      const durationMinutes = Number(data.timeout_minutes || 10);
+      await member.timeout(durationMinutes * 60 * 1000, `Dashboard timeout by ${req.userInfos.tag}`);
+      return redirectWithStatus(res, guild.id, "success", `${member.user.tag} wurde für ${durationMinutes} Minuten getimeoutet.`);
+    }
+
+    if (data.memberUntimeout) {
+      const member = await resolveMember(guild, resolvedMemberId);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
+      await member.timeout(null, `Dashboard untimeout by ${req.userInfos.tag}`);
+      return redirectWithStatus(res, guild.id, "success", `Timeout für ${member.user.tag} wurde entfernt.`);
+    }
+
+    if (data.memberKick) {
+      const member = await resolveMember(guild, resolvedMemberId);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
+      await member.kick(`Dashboard kick by ${req.userInfos.tag}`);
+      return redirectWithStatus(res, guild.id, "success", `${member.user.tag} wurde gekickt.`);
+    }
+
+    if (data.memberBan) {
+      const member = await resolveMember(guild, resolvedMemberId);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
+      const deleteMessageSeconds = Number(data.delete_message_seconds || 0);
+      await member.ban({
+        deleteMessageSeconds,
+        reason: `Dashboard ban by ${req.userInfos.tag}`,
+      });
+      return redirectWithStatus(res, guild.id, "success", `${member.user.tag} wurde gebannt.`);
+    }
+
+    if (data.memberUnban) {
+      if (!data.unban_user_id) {
+        return redirectWithStatus(res, guild.id, "danger", "Bitte User-ID zum Entbannen angeben.");
+      }
+      await guild.members.unban(data.unban_user_id, `Dashboard unban by ${req.userInfos.tag}`);
+      return redirectWithStatus(res, guild.id, "success", `User ${data.unban_user_id} wurde entbannt.`);
+    }
+
+    if (data.memberNick) {
+      const member = await resolveMember(guild, resolvedMemberId);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
+      await member.setNickname(data.nickname || null, `Dashboard nickname update by ${req.userInfos.tag}`);
+      return redirectWithStatus(res, guild.id, "success", `Nickname für ${member.user.tag} wurde aktualisiert.`);
+    }
+
+    return redirectWithStatus(res, guild.id, "warning", "Keine gültige Aktion erkannt.");
+  } catch (err) {
+    return redirectWithStatus(res, guild.id, "danger", err.message || "Aktion konnte nicht ausgeführt werden.");
+  }
 });
 
 module.exports = router;

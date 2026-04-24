@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+  <%- include('../includes/head') %>
+
+  <body class="hold-transition skin-black sidebar-mini">
+    <div class="wrapper">
+      <%- include('../includes/header') %>
+      <%- include('../includes/sidebar') %>
+
+      <div class="content-wrapper">
+        <section class="content-header">
+          <h3>Moderation Hub</h3>
+          <ol class="breadcrumb">
+            <li><a href="/"><i class="fa fa-home"></i>Selector</a></li>
+            <li><a href="<%=`/manage/${guild.id}/`%>"><%=guild.name%></a></li>
+            <li class="active">Moderation</li>
+          </ol>
+        </section>
+
+        <section class="content">
+          <% if (message) { %>
+          <div class="alert alert-<%= status || 'info' %>"><%= message %></div>
+          <% } %>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="box box-solid dashboard-card">
+                <div class="box-header with-border">
+                  <h3 class="box-title"><i class="fa fa-users"></i> Mitglieder verwalten</h3>
+                </div>
+                <form action="/manage/<%= guild.id %>/moderation" method="POST">
+                  <div class="box-body">
+                    <div class="form-group">
+                      <label>Mitglied</label>
+                      <select name="member_id" class="form-control">
+                        <option value="" disabled selected>Mitglied auswählen</option>
+                        <% members.forEach((member) => { %>
+                        <option value="<%= member.id %>"><%= member.user.tag %> · <%= member.displayName %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label>Oder User ID (Fallback)</label>
+                      <input class="form-control" type="text" name="member_id_manual" placeholder="Discord User ID" />
+                    </div>
+                    <div class="form-group">
+                      <label>Nickname (optional)</label>
+                      <input class="form-control" type="text" name="nickname" placeholder="Neuer Nickname oder leer zum Reset" />
+                    </div>
+                    <div class="grid-actions">
+                      <button class="btn btn-info" type="submit" name="memberNick">Nickname setzen</button>
+                      <button class="btn btn-warning" type="submit" name="memberTimeout">Timeout</button>
+                      <button class="btn btn-default" type="submit" name="memberUntimeout">Untimeout</button>
+                      <button class="btn btn-danger" type="submit" name="memberKick">Kick</button>
+                      <button class="btn btn-danger" type="submit" name="memberBan">Ban</button>
+                    </div>
+                    <div class="form-group mtop">
+                      <label>Timeout (Minuten)</label>
+                      <input class="form-control" type="number" min="1" max="40320" value="10" name="timeout_minutes" />
+                    </div>
+                    <div class="form-group">
+                      <label>Nachrichten löschen (Sekunden)</label>
+                      <input class="form-control" type="number" min="0" max="604800" value="0" name="delete_message_seconds" />
+                    </div>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="box box-solid dashboard-card">
+                <div class="box-header with-border">
+                  <h3 class="box-title"><i class="fa fa-id-badge"></i> Rollenverwaltung</h3>
+                </div>
+                <form action="/manage/<%= guild.id %>/moderation" method="POST">
+                  <div class="box-body">
+                    <div class="form-group">
+                      <label>Mitglied</label>
+                      <select name="member_id" class="form-control">
+                        <option value="" disabled selected>Mitglied auswählen</option>
+                        <% members.forEach((member) => { %>
+                        <option value="<%= member.id %>"><%= member.user.tag %> · <%= member.displayName %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label>Oder User ID (Fallback)</label>
+                      <input class="form-control" type="text" name="member_id_manual" placeholder="Discord User ID" />
+                    </div>
+                    <div class="form-group">
+                      <label>Rolle</label>
+                      <select name="role_id" class="form-control" required>
+                        <option value="" disabled selected>Rolle auswählen</option>
+                        <% roles.forEach((role) => { %>
+                        <option value="<%= role.id %>">@<%= role.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="grid-actions">
+                      <button class="btn btn-success" type="submit" name="memberRoleAdd">Rolle hinzufügen</button>
+                      <button class="btn btn-danger" type="submit" name="memberRoleRemove">Rolle entfernen</button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+
+              <div class="box box-solid dashboard-card">
+                <div class="box-header with-border">
+                  <h3 class="box-title"><i class="fa fa-unlock"></i> Entbannen</h3>
+                </div>
+                <form action="/manage/<%= guild.id %>/moderation" method="POST">
+                  <div class="box-body">
+                    <div class="form-group">
+                      <label>User ID</label>
+                      <input class="form-control" type="text" name="unban_user_id" placeholder="Discord User ID" required />
+                    </div>
+                    <button class="btn btn-primary" type="submit" name="memberUnban">User entbannen</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <%- include('../includes/footer') %>
+    </div>
+  </body>
+</html>
