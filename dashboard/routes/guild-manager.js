@@ -23,6 +23,28 @@ function redirectWithStatus(res, guildId, status, message) {
   return res.redirect(303, `/manage/${guildId}/moderation?${params.toString()}`);
 }
 
+function ensureDashboardDefaults(settings) {
+  if (!settings.ticket) settings.ticket = {};
+  if (!Array.isArray(settings.ticket.categories)) settings.ticket.categories = [];
+
+  if (!settings.suggestions) settings.suggestions = {};
+  if (!Array.isArray(settings.suggestions.staff_roles)) settings.suggestions.staff_roles = [];
+  if (typeof settings.suggestions.enabled !== "boolean") settings.suggestions.enabled = false;
+
+  return settings;
+}
+
+async function resolveMember(guild, memberId) {
+  if (!memberId) return null;
+  const cached = guild.members.cache.get(memberId);
+  if (cached) return cached;
+  try {
+    return await guild.members.fetch(memberId);
+  } catch {
+    return null;
+  }
+}
+
 router.get("/:serverID", CheckAuth, async (req, res) => {
   res.redirect(`/manage/${req.params.serverID}/basic`);
 });
@@ -328,6 +350,10 @@ router.get("/:serverID/features", CheckAuth, async (req, res) => {
   if (!guild) return;
 
   const guildInfos = await utils.fetchGuild(guild.id, req.client, req.user.guilds);
+  ensureDashboardDefaults(guildInfos);
+  const textChannels = guild.channels.cache
+    .filter((ch) => ch.type === 0)
+    .sort((a, b) => a.rawPosition - b.rawPosition)
   const textChannels = guild.channels.cache
     .filter((ch) => ch.type === 0)
     .sort((a, b) => a.position - b.position)
@@ -355,6 +381,7 @@ router.post("/:serverID/features", CheckAuth, async (req, res) => {
   const guild = ensureManageAccess(req, res);
   if (!guild) return;
 
+  const settings = ensureDashboardDefaults(await getSettings(guild));
   const settings = await getSettings(guild);
   const data = req.body;
 
@@ -462,6 +489,29 @@ router.get("/:serverID/moderation", CheckAuth, async (req, res) => {
   if (!guild) return;
 
   const guildInfos = await utils.fetchGuild(guild.id, req.client, req.user.guilds);
+  let displayedMembers = [];
+  let status = req.query.status;
+  let message = req.query.message;
+
+  try {
+    const members = await guild.members.fetch();
+    displayedMembers = members
+      .filter((member) => !member.user.bot)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+      .first(100);
+  } catch {
+    displayedMembers = guild.members.cache
+      .filter((member) => !member.user.bot)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+      .first(100);
+    status = status || "warning";
+    message =
+      message ||
+      "Mitglieder konnten nicht vollständig geladen werden. Bitte aktiviere den Server Members Intent für volle Funktionalität.";
+  }
+
+  const roles = guild.roles.cache
+    .filter((role) => role.name !== "@everyone" && !role.managed)
   const members = await guild.members.fetch();
   const displayedMembers = members
     .filter((member) => !member.user.bot)
@@ -480,6 +530,8 @@ router.get("/:serverID/moderation", CheckAuth, async (req, res) => {
     bot: req.client,
     members: displayedMembers,
     roles,
+    status,
+    message,
     status: req.query.status,
     message: req.query.message,
     currentURL: `${req.client.config.DASHBOARD.baseURL}/${req.originalUrl}`,
@@ -500,6 +552,10 @@ router.post("/:serverID/moderation", CheckAuth, async (req, res) => {
     }
 
     if (data.memberRoleAdd || data.memberRoleRemove) {
+      const member = await resolveMember(guild, data.member_id);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
       const member = await guild.members.fetch(data.member_id);
       if (!data.role_id) {
         return redirectWithStatus(res, guild.id, "danger", "Bitte eine Rolle auswählen.");
@@ -515,6 +571,10 @@ router.post("/:serverID/moderation", CheckAuth, async (req, res) => {
     }
 
     if (data.memberTimeout) {
+      const member = await resolveMember(guild, data.member_id);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
       const member = await guild.members.fetch(data.member_id);
       const durationMinutes = Number(data.timeout_minutes || 10);
       await member.timeout(durationMinutes * 60 * 1000, `Dashboard timeout by ${req.userInfos.tag}`);
@@ -522,18 +582,30 @@ router.post("/:serverID/moderation", CheckAuth, async (req, res) => {
     }
 
     if (data.memberUntimeout) {
+      const member = await resolveMember(guild, data.member_id);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
       const member = await guild.members.fetch(data.member_id);
       await member.timeout(null, `Dashboard untimeout by ${req.userInfos.tag}`);
       return redirectWithStatus(res, guild.id, "success", `Timeout für ${member.user.tag} wurde entfernt.`);
     }
 
     if (data.memberKick) {
+      const member = await resolveMember(guild, data.member_id);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
       const member = await guild.members.fetch(data.member_id);
       await member.kick(`Dashboard kick by ${req.userInfos.tag}`);
       return redirectWithStatus(res, guild.id, "success", `${member.user.tag} wurde gekickt.`);
     }
 
     if (data.memberBan) {
+      const member = await resolveMember(guild, data.member_id);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
       const member = await guild.members.fetch(data.member_id);
       const deleteMessageSeconds = Number(data.delete_message_seconds || 0);
       await member.ban({
@@ -552,6 +624,10 @@ router.post("/:serverID/moderation", CheckAuth, async (req, res) => {
     }
 
     if (data.memberNick) {
+      const member = await resolveMember(guild, data.member_id);
+      if (!member) {
+        return redirectWithStatus(res, guild.id, "danger", "Mitglied konnte nicht geladen werden.");
+      }
       const member = await guild.members.fetch(data.member_id);
       await member.setNickname(data.nickname || null, `Dashboard nickname update by ${req.userInfos.tag}`);
       return redirectWithStatus(res, guild.id, "success", `Nickname für ${member.user.tag} wurde aktualisiert.`);
