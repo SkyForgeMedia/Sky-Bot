@@ -32,12 +32,17 @@
                   <div class="box-body">
                     <div class="form-group">
                       <label>Mitglied</label>
+                      <select name="member_id" class="form-control">
                       <select name="member_id" class="form-control" required>
                         <option value="" disabled selected>Mitglied auswählen</option>
                         <% members.forEach((member) => { %>
                         <option value="<%= member.id %>"><%= member.user.tag %> · <%= member.displayName %></option>
                         <% }) %>
                       </select>
+                    </div>
+                    <div class="form-group">
+                      <label>Oder User ID (Fallback)</label>
+                      <input class="form-control" type="text" name="member_id_manual" placeholder="Discord User ID" />
                     </div>
                     <div class="form-group">
                       <label>Nickname (optional)</label>
@@ -72,12 +77,17 @@
                   <div class="box-body">
                     <div class="form-group">
                       <label>Mitglied</label>
+                      <select name="member_id" class="form-control">
                       <select name="member_id" class="form-control" required>
                         <option value="" disabled selected>Mitglied auswählen</option>
                         <% members.forEach((member) => { %>
                         <option value="<%= member.id %>"><%= member.user.tag %> · <%= member.displayName %></option>
                         <% }) %>
                       </select>
+                    </div>
+                    <div class="form-group">
+                      <label>Oder User ID (Fallback)</label>
+                      <input class="form-control" type="text" name="member_id_manual" placeholder="Discord User ID" />
                     </div>
                     <div class="form-group">
                       <label>Rolle</label>
