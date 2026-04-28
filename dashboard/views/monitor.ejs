@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <%- include('includes/head') %>
+
+  <body class="hold-transition skin-black sidebar-mini">
+    <div class="wrapper">
+      <%- include('includes/header') %>
+      <%- include('includes/sidebar') %>
+
+      <div class="content-wrapper">
+        <section class="content-header">
+          <h3>Server Monitor Dashboard</h3>
+          <ol class="breadcrumb">
+            <li><a href="/"><i class="fa fa-home"></i>Selector</a></li>
+            <li class="active">Monitor</li>
+          </ol>
+        </section>
+
+        <section class="content">
+          <% if (message) { %>
+          <div class="alert alert-<%= status || 'info' %>"><%= message %></div>
+          <% } %>
+
+          <div class="box box-solid dashboard-card">
+            <div class="box-header with-border"><h3 class="box-title">Guild auswählen</h3></div>
+            <div class="box-body">
+              <form method="GET" action="/dashboard/monitor" class="form-inline">
+                <select name="guildId" class="form-control" style="min-width: 320px">
+                  <% guilds.forEach((g) => { %>
+                  <option value="<%= g.id %>" <%= selectedGuildId === g.id ? 'selected' : '' %>><%= g.name %></option>
+                  <% }) %>
+                </select>
+                <button class="btn btn-primary" type="submit">Laden</button>
+              </form>
+            </div>
+          </div>
+
+          <% if (guild) { %>
+          <div class="row">
+            <div class="col-md-5">
+              <div class="box box-solid dashboard-card">
+                <div class="box-header with-border"><h3 class="box-title">Monitor hinzufügen</h3></div>
+                <form method="POST" action="/dashboard/monitor/add">
+                  <div class="box-body">
+                    <input type="hidden" name="guild_id" value="<%= guild.id %>" />
+                    <div class="form-group"><label>Name</label><input name="name" class="form-control" required /></div>
+                    <div class="form-group"><label>Host</label><input name="host" class="form-control" required /></div>
+                    <div class="form-group">
+                      <label>Typ</label>
+                      <select name="type" class="form-control">
+                        <option value="linux">Linux</option>
+                        <option value="minecraft">Minecraft</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label>Check</label>
+                      <select name="check" class="form-control">
+                        <option value="icmp">ICMP Ping</option>
+                        <option value="tcp">TCP Port</option>
+                      </select>
+                    </div>
+                    <div class="form-group"><label>Port (optional)</label><input name="port" type="number" class="form-control" /></div>
+                    <div class="form-group"><label>Intervall (sek)</label><input name="interval" type="number" min="15" value="60" class="form-control" /></div>
+                    <div class="form-group">
+                      <label>Discord Channel</label>
+                      <select name="channel_id" class="form-control" required>
+                        <% channels.forEach((ch) => { %>
+                        <option value="<%= ch.id %>">#<%= ch.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <div class="checkbox"><label><input type="checkbox" name="notify" /> Statusänderungen melden</label></div>
+                  </div>
+                  <div class="box-footer"><button class="btn btn-success" type="submit">Monitor erstellen</button></div>
+                </form>
+              </div>
+            </div>
+
+            <div class="col-md-7">
+              <div class="box box-solid dashboard-card">
+                <div class="box-header with-border"><h3 class="box-title">Live Status</h3></div>
+                <div class="box-body table-responsive">
+                  <table class="table table-striped" id="monitor-table">
+                    <thead>
+                      <tr>
+                        <th>Name</th><th>Host</th><th>Status</th><th>Latenz</th><th>Port</th><th>Letzter Check</th><th>Aktion</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% monitors.forEach((m) => { %>
+                      <tr>
+                        <td><%= m.name %><br/><small><%= m.id %></small></td>
+                        <td><%= m.host %> (<%= m.type %>/<%= m.check %>)</td>
+                        <td><span class="label <%= m.status === 'ONLINE' ? 'label-success' : m.status === 'OFFLINE' ? 'label-danger' : 'label-warning' %>"><%= m.status || 'UNKNOWN' %></span></td>
+                        <td><%= m.latency != null ? m.latency + ' ms' : '-' %></td>
+                        <td><%= m.port || '-' %></td>
+                        <td><%= m.lastCheck ? new Date(m.lastCheck).toLocaleString() : '-' %></td>
+                        <td>
+                          <form method="POST" action="/dashboard/monitor/remove">
+                            <input type="hidden" name="guild_id" value="<%= guild.id %>" />
+                            <input type="hidden" name="monitor_id" value="<%= m.id %>" />
+                            <button class="btn btn-xs btn-danger">Entfernen</button>
+                          </form>
+                        </td>
+                      </tr>
+                      <% }) %>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+          <% } %>
+        </section>
+      </div>
+
+      <%- include('includes/footer') %>
+    </div>
+
+    <% if (guild) { %>
+    <script>
+      setInterval(async () => {
+        const res = await fetch(`/dashboard/monitor/data?guildId=<%= guild.id %>`);
+        if (!res.ok) return;
+        const monitors = await res.json();
+        const tbody = document.querySelector('#monitor-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = monitors.map((m) => {
+          const statusCls = m.status === 'ONLINE' ? 'label-success' : m.status === 'OFFLINE' ? 'label-danger' : 'label-warning';
+          const last = m.lastCheck ? new Date(m.lastCheck).toLocaleString() : '-';
+          return `
+          <tr>
+            <td>${m.name}<br/><small>${m.id}</small></td>
+            <td>${m.host} (${m.type}/${m.check})</td>
+            <td><span class="label ${statusCls}">${m.status || 'UNKNOWN'}</span></td>
+            <td>${m.latency != null ? `${m.latency} ms` : '-'}</td>
+            <td>${m.port || '-'}</td>
+            <td>${last}</td>
+            <td>
+              <form method="POST" action="/dashboard/monitor/remove">
+                <input type="hidden" name="guild_id" value="<%= guild.id %>" />
+                <input type="hidden" name="monitor_id" value="${m.id}" />
+                <button class="btn btn-xs btn-danger">Entfernen</button>
+              </form>
+            </td>
+          </tr>`;
+        }).join('');
+      }, 10000);
+    </script>
+    <% } %>
+  </body>
+</html>
