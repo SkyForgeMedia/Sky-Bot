@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+  <%- include('../includes/head') %>
+
+  <body class="hold-transition skin-black sidebar-mini">
+    <div class="wrapper">
+      <%- include('../includes/header') %>
+      <%- include('../includes/sidebar') %>
+
+      <div class="content-wrapper">
+        <section class="content-header">
+          <h3>Feature Center</h3>
+          <ol class="breadcrumb">
+            <li><a href="/"><i class="fa fa-home"></i>Selector</a></li>
+            <li><a href="<%=`/manage/${guild.id}/`%>"><%=guild.name%></a></li>
+            <li class="active">Features</li>
+          </ol>
+        </section>
+
+        <section class="content">
+          <% if (message) { %>
+          <div class="alert alert-<%= status || 'info' %>"><%= message %></div>
+          <% } %>
+
+          <div class="row">
+            <div class="col-md-6">
+              <div class="box box-solid dashboard-card">
+                <div class="box-header with-border"><h3 class="box-title">Autorole (admin/autorole)</h3></div>
+                <form action="/manage/<%= guild.id %>/features" method="POST">
+                  <div class="box-body">
+                    <div class="form-group">
+                      <label>Rolle</label>
+                      <select name="autorole_id" class="form-control">
+                        <option value="none">Deaktivieren</option>
+                        <% roles.forEach((role) => { %>
+                        <option value="<%= role.id %>" <%= guild.autorole === role.id ? 'selected' : '' %>>@<%= role.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <button class="btn btn-primary" type="submit" name="autoroleSave">Speichern</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="box box-solid dashboard-card">
+                <div class="box-header with-border"><h3 class="box-title">Ticket Kategorien (ticketcat)</h3></div>
+                <form action="/manage/<%= guild.id %>/features" method="POST">
+                  <div class="box-body">
+                    <div class="form-group">
+                      <label>Neue Kategorie</label>
+                      <input type="text" class="form-control" name="ticket_category_name" placeholder="z.B. Support" />
+                    </div>
+                    <div class="form-group">
+                      <label>Staff Rollen</label>
+                      <select name="ticket_staff_roles" multiple class="form-control" size="6">
+                        <% roles.forEach((role) => { %>
+                        <option value="<%= role.id %>">@<%= role.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <button class="btn btn-success" type="submit" name="ticketCategoryAdd">Kategorie hinzufügen</button>
+                  </div>
+                </form>
+
+                <form action="/manage/<%= guild.id %>/features" method="POST">
+                  <div class="box-body">
+                    <div class="form-group">
+                      <label>Kategorie entfernen</label>
+                      <select name="ticket_category_remove" class="form-control">
+                        <option value="" disabled selected>Kategorie wählen</option>
+                        <% guild.ticket.categories.forEach((category) => { %>
+                        <option value="<%= category.name %>"><%= category.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+                    <button class="btn btn-danger" type="submit" name="ticketCategoryRemove">Kategorie entfernen</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <div class="box box-solid dashboard-card">
+                <div class="box-header with-border"><h3 class="box-title">Suggestions (suggestion)</h3></div>
+                <form action="/manage/<%= guild.id %>/features" method="POST">
+                  <div class="box-body">
+                    <div class="checkbox">
+                      <label><input type="checkbox" name="suggestion_enabled" <%= guild.suggestions?.enabled ? 'checked' : '' %> /> Suggestion System aktiv</label>
+                    </div>
+
+                    <div class="form-group">
+                      <label>Suggestion Channel</label>
+                      <select name="suggestion_channel_id" class="form-control">
+                        <option value="">Kein Channel</option>
+                        <% textChannels.forEach((ch) => { %>
+                        <option value="<%= ch.id %>" <%= guild.suggestions?.channel_id === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label>Approved Channel</label>
+                      <select name="suggestion_approved_channel" class="form-control">
+                        <option value="">Kein Channel</option>
+                        <% textChannels.forEach((ch) => { %>
+                        <option value="<%= ch.id %>" <%= guild.suggestions?.approved_channel === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label>Rejected Channel</label>
+                      <select name="suggestion_rejected_channel" class="form-control">
+                        <option value="">Kein Channel</option>
+                        <% textChannels.forEach((ch) => { %>
+                        <option value="<%= ch.id %>" <%= guild.suggestions?.rejected_channel === ch.id ? 'selected' : '' %>>#<%= ch.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+
+                    <div class="form-group">
+                      <label>Staff Rollen</label>
+                      <select name="suggestion_staff_roles" multiple class="form-control" size="6">
+                        <% roles.forEach((role) => { %>
+                        <option value="<%= role.id %>" <%= guild.suggestions?.staff_roles?.includes(role.id) ? 'selected' : '' %>>@<%= role.name %></option>
+                        <% }) %>
+                      </select>
+                    </div>
+
+                    <button class="btn btn-primary" type="submit" name="suggestionSave">Suggestion speichern</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <%- include('../includes/footer') %>
+    </div>
+  </body>
+</html>

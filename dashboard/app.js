@@ -16,7 +16,8 @@ module.exports.launch = async (client) => {
   const mainRouter = require("./routes/index"),
     discordAPIRouter = require("./routes/discord"),
     logoutRouter = require("./routes/logout"),
-    guildManagerRouter = require("./routes/guild-manager");
+    guildManagerRouter = require("./routes/guild-manager"),
+    monitorRouter = require("./routes/monitor");
 
   client.states = {};
   client.config = config;
@@ -58,6 +59,7 @@ module.exports.launch = async (client) => {
     .use("/api", discordAPIRouter)
     .use("/logout", logoutRouter)
     .use("/manage", guildManagerRouter)
+    .use("/dashboard/monitor", monitorRouter)
     .use("/", mainRouter)
     .use(CheckAuth, function (req, res) {
       res.status(404).render("404", {
