@@ -20,6 +20,7 @@ module.exports = {
       { trigger: "remove <id>", description: "Remove monitor by id" },
       { trigger: "list", description: "List monitors in this guild" },
     ],
+    enabled: false,
   },
   slashCommand: {
     enabled: true,

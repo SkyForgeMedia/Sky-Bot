@@ -159,6 +159,7 @@ class MonitorService {
       if (monitor.type === "minecraft") {
         const mcCheck = ["icmp", "tcp"].includes(monitor.check) ? monitor.check : "tcp";
         return await this.checkMinecraft(monitor.host, monitor.port || 25565, mcCheck);
+        return await this.checkMinecraft(monitor.host, monitor.port || 25565, monitor.check || "tcp");
       }
 
       if (monitor.check === "icmp") {
