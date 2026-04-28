@@ -13,7 +13,10 @@ module.exports = {
     enabled: true,
     minArgsCount: 1,
     subcommands: [
-      { trigger: "add <name> <host> <type> [check] [port] [interval]", description: "Add monitor via prefix command" },
+      {
+        trigger: "add <name> <host> <type> [check] [port] [interval]",
+        description: "Add monitor via prefix command (check: icmp|tcp|udp|http|https)",
+      },
       { trigger: "remove <id>", description: "Remove monitor by id" },
       { trigger: "list", description: "List monitors in this guild" },
     ],
@@ -47,6 +50,9 @@ module.exports = {
             choices: [
               { name: "ICMP Ping", value: "icmp" },
               { name: "TCP Port", value: "tcp" },
+              { name: "UDP Port", value: "udp" },
+              { name: "HTTP", value: "http" },
+              { name: "HTTPS", value: "https" },
             ],
           },
           { name: "port", description: "TCP port (optional)", type: ApplicationCommandOptionType.Integer, required: false },
