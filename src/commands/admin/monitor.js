@@ -10,6 +10,16 @@ module.exports = {
   userPermissions: ["ManageGuild"],
   botPermissions: ["SendMessages", "EmbedLinks", "ReadMessageHistory"],
   command: {
+    enabled: true,
+    minArgsCount: 1,
+    subcommands: [
+      {
+        trigger: "add <name> <host> <type> [check] [port] [interval]",
+        description: "Add monitor via prefix command (check: icmp|tcp|udp|http|https)",
+      },
+      { trigger: "remove <id>", description: "Remove monitor by id" },
+      { trigger: "list", description: "List monitors in this guild" },
+    ],
     enabled: false,
   },
   slashCommand: {
@@ -41,6 +51,9 @@ module.exports = {
             choices: [
               { name: "ICMP Ping", value: "icmp" },
               { name: "TCP Port", value: "tcp" },
+              { name: "UDP Port", value: "udp" },
+              { name: "HTTP", value: "http" },
+              { name: "HTTPS", value: "https" },
             ],
           },
           { name: "port", description: "TCP port (optional)", type: ApplicationCommandOptionType.Integer, required: false },
@@ -77,6 +90,48 @@ module.exports = {
         type: ApplicationCommandOptionType.Subcommand,
       },
     ],
+  },
+
+  async messageRun(message, args) {
+    const monitorService = message.client.monitorService;
+    if (!monitorService) return message.safeReply("Monitor service is not initialized.");
+
+    const sub = args[0]?.toLowerCase();
+    if (sub === "list") {
+      const monitors = monitorService.getMonitors(message.guild.id);
+      if (!monitors.length) return message.safeReply("Keine Monitore eingerichtet.");
+      return message.safeReply(
+        monitors
+          .map((m) => `• \`${m.id}\` **${m.name}** — ${m.host}${m.port ? `:${m.port}` : ""} | ${m.type}/${m.check}`)
+          .join("\n")
+      );
+    }
+
+    if (sub === "remove") {
+      const id = args[1];
+      if (!id) return message.safeReply("Bitte eine Monitor-ID angeben.");
+      const ok = await monitorService.removeMonitor(id);
+      return message.safeReply(ok ? `Monitor \`${id}\` entfernt.` : "Monitor nicht gefunden.");
+    }
+
+    if (sub === "add") {
+      const [_, name, host, type = "linux", check = type === "minecraft" ? "tcp" : "icmp", port, interval] = args;
+      if (!name || !host) return message.safeReply("Usage: add <name> <host> <type> [check] [port] [interval]");
+      const monitor = await monitorService.createMonitor({
+        guildId: message.guild.id,
+        channelId: message.channel.id,
+        name,
+        host,
+        type,
+        check,
+        port: port ? Number(port) : null,
+        interval: interval ? Number(interval) : 60,
+        notify: false,
+      });
+      return message.safeReply(`✅ Monitor erstellt: **${monitor.name}** (\`${monitor.id}\`)`);
+    }
+
+    return message.safeReply("Subcommand: add | remove | list");
   },
 
   async interactionRun(interaction) {

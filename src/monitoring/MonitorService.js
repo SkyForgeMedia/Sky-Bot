@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const net = require("net");
 const { execFile } = require("child_process");
 const fetch = require("node-fetch");
+const dgram = require("dgram");
 const MonitorStore = require("./MonitorStore");
 
 class MonitorService {
@@ -156,11 +157,25 @@ class MonitorService {
   async runCheck(monitor) {
     try {
       if (monitor.type === "minecraft") {
+        const mcCheck = ["icmp", "tcp"].includes(monitor.check) ? monitor.check : "tcp";
+        return await this.checkMinecraft(monitor.host, monitor.port || 25565, mcCheck);
         return await this.checkMinecraft(monitor.host, monitor.port || 25565, monitor.check || "tcp");
       }
 
       if (monitor.check === "icmp") {
         return await this.checkIcmp(monitor.host);
+      }
+
+      if (monitor.check === "udp") {
+        return await this.checkUdp(monitor.host, monitor.port || 53);
+      }
+
+      if (monitor.check === "http") {
+        return await this.checkHttp(monitor.host, false);
+      }
+
+      if (monitor.check === "https") {
+        return await this.checkHttp(monitor.host, true);
       }
 
       return await this.checkTcp(monitor.host, monitor.port || 22);
@@ -207,6 +222,60 @@ class MonitorService {
       socket.once("error", (err) => done({ status: "OFFLINE", latency: null, error: err.code || err.message }));
       socket.connect(Number(port), host);
     });
+  }
+
+  checkUdp(host, port) {
+    return new Promise((resolve) => {
+      const socket = dgram.createSocket("udp4");
+      const started = Date.now();
+      let done = false;
+
+      const finish = (payload) => {
+        if (done) return;
+        done = true;
+        socket.close();
+        resolve(payload);
+      };
+
+      const timeout = setTimeout(() => {
+        finish({ status: "UNKNOWN", latency: null, error: "No UDP response" });
+      }, 3000);
+
+      socket.on("message", () => {
+        clearTimeout(timeout);
+        finish({ status: "ONLINE", latency: Date.now() - started, error: null });
+      });
+
+      socket.on("error", (err) => {
+        clearTimeout(timeout);
+        finish({ status: "OFFLINE", latency: null, error: err.code || err.message });
+      });
+
+      const probe = Buffer.from("ping");
+      socket.send(probe, Number(port), host, (err) => {
+        if (err) {
+          clearTimeout(timeout);
+          finish({ status: "OFFLINE", latency: null, error: err.code || err.message });
+        }
+      });
+    });
+  }
+
+  async checkHttp(host, secure = false) {
+    const started = Date.now();
+    const base = host.startsWith("http://") || host.startsWith("https://") ? host : `${secure ? "https" : "http"}://${host}`;
+    const url = base.endsWith("/") ? base : `${base}/`;
+
+    try {
+      const response = await fetch(url, { timeout: 4000, redirect: "follow" });
+      const latency = Date.now() - started;
+      if (response.status >= 200 && response.status < 500) {
+        return { status: "ONLINE", latency, error: null };
+      }
+      return { status: "UNKNOWN", latency, error: `HTTP ${response.status}` };
+    } catch (err) {
+      return { status: "OFFLINE", latency: null, error: err.code || err.message || "HTTP request failed" };
+    }
   }
 
   async checkMinecraft(host, port, check = "tcp") {

@@ -23,6 +23,48 @@ function redirectWithStatus(res, guildId, status, message) {
   return res.redirect(303, `/manage/${guildId}/moderation?${params.toString()}`);
 }
 
+function ensureDashboardDefaults(settings) {
+  if (!settings.ticket) settings.ticket = {};
+  if (!Array.isArray(settings.ticket.categories)) settings.ticket.categories = [];
+
+  if (!settings.suggestions) settings.suggestions = {};
+  if (!Array.isArray(settings.suggestions.staff_roles)) settings.suggestions.staff_roles = [];
+  if (typeof settings.suggestions.enabled !== "boolean") settings.suggestions.enabled = false;
+
+  return settings;
+}
+
+async function resolveMember(guild, memberId) {
+  if (!memberId) return null;
+  const cached = guild.members.cache.get(memberId);
+  if (cached) return cached;
+  try {
+    return await guild.members.fetch(memberId);
+  } catch {
+    return null;
+  }
+}
+
+async function fetchMembersWithTimeout(guild, timeoutMs = 5000) {
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("MEMBER_FETCH_TIMEOUT")), timeoutMs);
+  });
+
+  try {
+    const members = await Promise.race([guild.members.fetch(), timeoutPromise]);
+    return { members, fromCacheOnly: false };
+  } catch {
+    return { members: guild.members.cache, fromCacheOnly: true };
+  }
+  }
+  return guild;
+}
+
+function redirectWithStatus(res, guildId, status, message) {
+  const params = new URLSearchParams({ status, message });
+  return res.redirect(303, `/manage/${guildId}/moderation?${params.toString()}`);
+}
+
 router.get("/:serverID", CheckAuth, async (req, res) => {
   res.redirect(`/manage/${req.params.serverID}/basic`);
 });
