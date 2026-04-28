@@ -36,6 +36,8 @@ process.on("unhandledRejection", (err) => client.logger.error(`Unhandled excepti
       await launch(client);
     } catch (ex) {
       client.logger.error("Failed to launch dashboard", ex);
+      client.logger.log("Falling back to direct database initialization...");
+      await initializeMongoose();
     }
   } else {
     // initialize the database

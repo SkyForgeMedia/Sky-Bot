@@ -1,6 +1,7 @@
 const { counterHandler, inviteHandler, presenceHandler } = require("@src/handlers");
 const { cacheReactionRoles } = require("@schemas/ReactionRoles");
 const { getSettings } = require("@schemas/Guild");
+const MonitorService = require("@src/monitoring/MonitorService");
 
 /**
  * @param {import('@src/structures').BotClient} client
@@ -31,8 +32,33 @@ module.exports = async (client) => {
     else await client.registerInteractions(client.config.INTERACTIONS.TEST_GUILD_ID);
   }
 
+  // Always ensure /monitor exists at guild-level for faster availability
+  if (client.slashCommands.has("monitor")) {
+    const monitorCmd = client.slashCommands.get("monitor");
+    const payload = {
+      name: monitorCmd.name,
+      description: monitorCmd.description,
+      options: monitorCmd.slashCommand.options,
+    };
+
+    for (const guild of client.guilds.cache.values()) {
+      try {
+        const existing = (await guild.commands.fetch()).find((c) => c.name === monitorCmd.name);
+        if (existing) await guild.commands.edit(existing.id, payload);
+        else await guild.commands.create(payload);
+      } catch (err) {
+        client.logger.warn(`Could not register /monitor in guild ${guild.id}: ${err.message}`);
+      }
+    }
+  }
+
   // Load reaction roles to cache
   await cacheReactionRoles(client);
+
+  // Initialize monitor service
+  client.monitorService = new MonitorService(client);
+  await client.monitorService.initialize();
+  client.logger.success("Monitor service initialized");
 
   for (const guild of client.guilds.cache.values()) {
     const settings = await getSettings(guild);
