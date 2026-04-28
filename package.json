@@ -13,6 +13,7 @@
     "start": "node .",
     "test": "npm run test:syntax",
     "test:syntax": "node --check bot.js && node --check dashboard/app.js && node --check dashboard/routes/guild-manager.js && node --check dashboard/routes/monitor.js && node --check src/handlers/index.js && node --check src/monitoring/MonitorService.js",
+    "test:syntax": "node --check bot.js && node --check dashboard/app.js && node --check dashboard/routes/guild-manager.js && node --check src/handlers/index.js",
     "format": "prettier --write src",
     "docker:package": "tar -cf discord-js-bot.tar dashboard logs src bot.js config.js dockerfile package.json package-lock.json",
     "docker:build": "docker build -t saitejamadha/discord-js-bot:5.5.0 ."

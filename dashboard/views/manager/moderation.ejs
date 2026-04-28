@@ -33,6 +33,7 @@
                     <div class="form-group">
                       <label>Mitglied</label>
                       <select name="member_id" class="form-control">
+                      <select name="member_id" class="form-control" required>
                         <option value="" disabled selected>Mitglied auswählen</option>
                         <% members.forEach((member) => { %>
                         <option value="<%= member.id %>"><%= member.user.tag %> · <%= member.displayName %></option>
@@ -77,6 +78,7 @@
                     <div class="form-group">
                       <label>Mitglied</label>
                       <select name="member_id" class="form-control">
+                      <select name="member_id" class="form-control" required>
                         <option value="" disabled selected>Mitglied auswählen</option>
                         <% members.forEach((member) => { %>
                         <option value="<%= member.id %>"><%= member.user.tag %> · <%= member.displayName %></option>
